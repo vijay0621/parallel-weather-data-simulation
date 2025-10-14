@@ -2,7 +2,7 @@ import os
 import json
 import time
 from datetime import datetime
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 import requests
 from mpi4py import MPI
@@ -12,6 +12,7 @@ from mpi4py import MPI
 TAG_START = 11
 TAG_PROGRESS = 12
 TAG_DONE = 13
+TAG_HALO = 21
 
 
 def _ensure_parent_dir(path: str) -> None:
@@ -61,12 +62,51 @@ def _fetch_one(district: Dict[str, Any], api_key: str, timeout: float) -> Dict[s
         }
 
 
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    from math import radians, sin, cos, asin, sqrt
+    R = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+    return R * c
+
+
+def _pearson(x: List[float], y: List[float]) -> Optional[float]:
+    n = min(len(x), len(y))
+    if n < 3:
+        return None
+    x = x[-n:]
+    y = y[-n:]
+    mx = sum(x) / n
+    my = sum(y) / n
+    num = sum((xi - mx) * (yi - my) for xi, yi in zip(x, y))
+    denx = sum((xi - mx) ** 2 for xi in x)
+    deny = sum((yi - my) ** 2 for yi in y)
+    if denx <= 0 or deny <= 0:
+        return None
+    return num / (denx ** 0.5 * deny ** 0.5)
+
+
+def _z_score(latest: float, series: List[float]) -> Optional[float]:
+    n = len(series)
+    if n < 5:
+        return None
+    mean = sum(series) / n
+    var = sum((v - mean) ** 2 for v in series) / n
+    std = var ** 0.5
+    if std == 0:
+        return 0.0
+    return (latest - mean) / std
+
+
 def fetch_weather_data(
     districts: List[Dict[str, Any]],
     output_file: str,
     num_processors: int = 4,
     progress_file: str = 'data/progress.json',
     metrics_file: str = 'data/metrics.json',
+    anomaly_file: str = 'mpi_output/anomaly_report.json',
 ) -> bool:
     """
     Parallel weather fetch using mpi4py demonstrating multiple MPI concepts:
@@ -118,6 +158,22 @@ def fetch_weather_data(
     my_chunk: List[Dict[str, Any]] = comm.scatter(worker_chunks, root=0) if size > 1 else worker_chunks[0]
     my_thresholds: Dict[str, float] = comm.scatter(thresholds, root=0) if size > 1 else {'temp_gt': 30, 'humidity_gt': 80}
 
+    # Precompute neighbor adjacency on root and broadcast
+    if rank == 0:
+        name_to_idx = {d['name']: i for i, d in enumerate(districts)}
+        adjacency: Dict[str, List[str]] = {}
+        for i, a in enumerate(districts):
+            adj = []
+            for j, b in enumerate(districts):
+                if i == j:
+                    continue
+                if _haversine_km(a['lat'], a['lon'], b['lat'], b['lon']) <= 100.0:
+                    adj.append(b['name'])
+            adjacency[a['name']] = adj
+    else:
+        adjacency = None
+    adjacency = comm.bcast(adjacency, root=0)
+
     # Synchronize start (Barrier)
     comm.Barrier()
     t0 = MPI.Wtime()
@@ -159,6 +215,23 @@ def fetch_weather_data(
     local_results: List[Dict[str, Any]] = []
     local_alerts: List[Dict[str, Any]] = []
     local_request_durations: List[float] = []
+    # History and anomalies
+    history_dir = 'mpi_output'
+    if rank == 0 and size == 1:
+        _ensure_parent_dir(os.path.join(history_dir, 'dummy'))
+    elif rank != 0:
+        _ensure_parent_dir(os.path.join(history_dir, 'dummy'))
+    history_path = os.path.join(history_dir, f'history_rank_{rank}.json')
+    try:
+        if os.path.exists(history_path):
+            with open(history_path, 'r') as f:
+                history_map: Dict[str, List[Dict[str, Any]]] = json.load(f)
+        else:
+            history_map = {}
+    except Exception:
+        history_map = {}
+    anomaly_reports_local: List[Dict[str, Any]] = []
+    per_rank_anomaly_counts = {'low': 0, 'medium': 0, 'high': 0, 'critical': 0}
     local_temp_sum = 0.0
     local_temp_sumsq = 0.0
     local_temp_count = 0
@@ -181,6 +254,85 @@ def fetch_weather_data(
             # enrich with rank metadata
             item['processor_rank'] = rank
             item['total_processors'] = size
+            # maintain history circular buffer (last 10)
+            now_iso = datetime.now().isoformat()
+            rec = {
+                'ts': now_iso,
+                'temperature_c': item.get('temperature_c'),
+                'humidity_pct': item.get('humidity_pct'),
+                'rainfall_mm': item.get('rainfall_mm'),
+                'wind_speed_ms': item.get('wind_speed_ms'),
+            }
+            hlist = history_map.get(item['district'], [])
+            hlist.append(rec)
+            if len(hlist) > 10:
+                hlist = hlist[-10:]
+            history_map[item['district']] = hlist
+
+            # anomaly detection using z-score threshold
+            z_threshold = 2.0
+            # temperature spike/drop
+            temps = [r['temperature_c'] for r in hlist if r.get('temperature_c') is not None]
+            hums = [r['humidity_pct'] for r in hlist if r.get('humidity_pct') is not None]
+            rains = [r['rainfall_mm'] for r in hlist if r.get('rainfall_mm') is not None]
+            winds = [r['wind_speed_ms'] for r in hlist if r.get('wind_speed_ms') is not None]
+            # helper to classify severity by abs z
+            def sev_for(z: float) -> str:
+                az = abs(z)
+                if az >= 3.0:
+                    return 'critical'
+                if az >= 2.5:
+                    return 'high'
+                if az >= 2.0:
+                    return 'medium'
+                return 'low'
+
+            latest_temp = temps[-1] if temps else None
+            latest_hum = hums[-1] if hums else None
+            latest_rain = rains[-1] if rains else None
+            latest_wind = winds[-1] if winds else None
+            district_anomaly_sev = None
+            district_anomaly_types: List[str] = []
+
+            if latest_temp is not None:
+                zt = _z_score(latest_temp, temps)
+                if zt is not None and abs(zt) >= z_threshold:
+                    atype = 'temp_spike' if zt > 0 else 'temp_drop'
+                    sev = sev_for(zt)
+                    anomaly_reports_local.append({'district': item['district'], 'type': atype, 'severity': sev, 'z_score': round(float(zt), 3)})
+                    per_rank_anomaly_counts[sev] += 1
+                    district_anomaly_types.append(atype)
+                    district_anomaly_sev = sev if district_anomaly_sev is None else max(district_anomaly_sev, sev, key=lambda s: ['low','medium','high','critical'].index(s))
+
+            if latest_hum is not None:
+                zh = _z_score(latest_hum, hums)
+                if zh is not None and abs(zh) >= z_threshold:
+                    sev = sev_for(zh)
+                    anomaly_reports_local.append({'district': item['district'], 'type': 'humidity_extreme', 'severity': sev, 'z_score': round(float(zh), 3)})
+                    per_rank_anomaly_counts[sev] += 1
+                    district_anomaly_types.append('humidity_extreme')
+                    district_anomaly_sev = sev if district_anomaly_sev is None else max(district_anomaly_sev, sev, key=lambda s: ['low','medium','high','critical'].index(s))
+
+            # rainfall onset: last was 0 and now > 0
+            if len(rains) >= 2 and rains[-2] == 0 and (latest_rain or 0) > 0:
+                sev = 'medium'
+                anomaly_reports_local.append({'district': item['district'], 'type': 'rain_onset', 'severity': sev, 'z_score': None})
+                per_rank_anomaly_counts[sev] += 1
+                district_anomaly_types.append('rain_onset')
+                district_anomaly_sev = district_anomaly_sev or sev
+
+            if latest_wind is not None:
+                zw = _z_score(latest_wind, winds)
+                if zw is not None and abs(zw) >= z_threshold:
+                    sev = sev_for(zw)
+                    anomaly_reports_local.append({'district': item['district'], 'type': 'wind_anomaly', 'severity': sev, 'z_score': round(float(zw), 3)})
+                    per_rank_anomaly_counts[sev] += 1
+                    district_anomaly_types.append('wind_anomaly')
+                    district_anomaly_sev = sev if district_anomaly_sev is None else max(district_anomaly_sev, sev, key=lambda s: ['low','medium','high','critical'].index(s))
+
+            item['anomaly_severity'] = district_anomaly_sev
+            item['anomaly_types'] = district_anomaly_types
+
             local_results.append(item)
 
             # stats accumulation only if we have temperature
@@ -234,6 +386,14 @@ def fetch_weather_data(
             except Exception:
                 pass
 
+        # persist history for this rank
+        try:
+            _ensure_parent_dir(history_path)
+            with open(history_path, 'w') as f:
+                json.dump(history_map, f)
+        except Exception:
+            pass
+
         # blocking notify done (Send)
         if size > 1:
             comm.send({'rank': rank, 'done': done_items, 'total': total_items}, dest=0, tag=TAG_DONE)
@@ -282,15 +442,137 @@ def fetch_weather_data(
                     })
             time.sleep(0.03)
 
+    # Halo exchange: boundary histories for spatial correlation
+    boundary_exchange_time = 0.0
+    correlation_map_local: Dict[str, float] = {}
+    regional_flags_local: List[Dict[str, Any]] = []
+    if size == 1 or rank != 0:
+        # Build owner map on all ranks (broadcast implicit via scatter knowledge)
+        owner_map: Dict[str, int] = {}
+        if size > 1:
+            # gather owner mapping at root then bcast
+            # construct local mapping for my chunk
+            local_owners = {x['district']: rank for x in local_results}
+            gathered = comm.gather(local_owners, root=0)
+            if rank == 0:
+                # not used in this branch
+                pass
+            else:
+                owner_map = None
+            if rank == 0:
+                merged = {}
+                for m in gathered:
+                    if m:
+                        merged.update(m)
+                owner_map = merged
+            owner_map = comm.bcast(owner_map, root=0)
+        else:
+            owner_map = {x['district']: 0 for x in local_results}
+
+        # Identify boundary districts and neighbor ranks
+        my_names = [x['district'] for x in local_results]
+        need_from_rank: Dict[int, List[str]] = {}
+        send_to_rank: Dict[int, Dict[str, List[Dict[str, Any]]]] = {}
+        for dn in my_names:
+            for nb in adjacency.get(dn, []):
+                r = owner_map.get(nb)
+                if r is None or r == rank:
+                    continue
+                need_from_rank.setdefault(r, []).append(nb)
+        # Prepare histories to send to neighbors (my boundary)
+        for other_r in set(need_from_rank.keys()):
+            # find my districts that are neighbors of other_r's districts
+            to_send_names = []
+            for their_name in need_from_rank[other_r]:
+                # any of my names that are neighbor of their_name
+                for myn in my_names:
+                    if myn in adjacency and their_name in adjacency and (myn in adjacency[their_name] or their_name in adjacency[myn]):
+                        to_send_names.append(myn)
+            uniq = sorted(set(to_send_names))
+            payload = {n: history_map.get(n, []) for n in uniq}
+            send_to_rank[other_r] = payload
+
+        # Non-blocking halo exchange with neighbor ranks
+        t_halo0 = time.perf_counter()
+        recv_reqs: Dict[int, MPI.Request] = {}
+        recv_buffers: Dict[int, Any] = {}
+        send_reqs: List[MPI.Request] = []
+        for other_r, payload in send_to_rank.items():
+            send_reqs.append(comm.isend(payload, dest=other_r, tag=TAG_HALO))
+            recv_reqs[other_r] = comm.irecv(source=other_r, tag=TAG_HALO)
+        # wait for receives
+        for other_r, req in recv_reqs.items():
+            try:
+                recv_buffers[other_r] = req.wait()
+            except Exception:
+                recv_buffers[other_r] = {}
+        # ensure sends complete
+        for sreq in send_reqs:
+            try:
+                sreq.wait()
+            except Exception:
+                pass
+        boundary_exchange_time = time.perf_counter() - t_halo0
+
+        # Build correlation map using received neighbor histories
+        # Compose neighbor series by name
+        neighbor_histories: Dict[str, List[Dict[str, Any]]] = {}
+        for _r, payload in recv_buffers.items():
+            if isinstance(payload, dict):
+                neighbor_histories.update(payload)
+
+        # For each of my districts, compute correlation with neighbor districts
+        for dn in my_names:
+            my_hist = history_map.get(dn, [])
+            my_temps = [r.get('temperature_c') for r in my_hist if r.get('temperature_c') is not None]
+            if len(my_temps) < 3:
+                continue
+            for nb in adjacency.get(dn, []):
+                if nb not in neighbor_histories:
+                    continue
+                nb_hist = neighbor_histories.get(nb, [])
+                nb_temps = [r.get('temperature_c') for r in nb_hist if r.get('temperature_c') is not None]
+                if len(nb_temps) < 3:
+                    continue
+                corr = _pearson(my_temps[-10:], nb_temps[-10:])
+                if corr is not None:
+                    key = f"{dn}|{nb}"
+                    correlation_map_local[key] = round(float(corr), 3)
+
+        # Regional pattern classification for current anomalies
+        my_anom_names = {r['district'] for r in anomaly_reports_local}
+        for dn in my_anom_names:
+            # count neighbor anomalies (based on simple z on neighbor latest history)
+            neigh_anom_count = 0
+            for nb in adjacency.get(dn, []):
+                nb_hist = neighbor_histories.get(nb, [])
+                temps = [r.get('temperature_c') for r in nb_hist if r.get('temperature_c') is not None]
+                if len(temps) >= 5:
+                    zt = _z_score(temps[-1], temps)
+                    if zt is not None and abs(zt) >= 2.0:
+                        neigh_anom_count += 1
+            cls = 'isolated' if neigh_anom_count == 0 else ('regional' if neigh_anom_count >= 3 else 'local_cluster')
+            regional_flags_local.append({'district': dn, 'pattern': cls, 'neighbor_anomaly_count': neigh_anom_count})
+
     # Gather results (Gather)
     if size > 1:
         all_results_lists = comm.gather(local_results, root=0)
         all_alerts_lists = comm.gather(local_alerts, root=0)
         per_rank_times = comm.gather(sum(local_request_durations), root=0)
+        all_anomaly_reports = comm.gather(anomaly_reports_local, root=0)
+        boundary_exchange_times = comm.gather(boundary_exchange_time, root=0)
+        per_rank_anomaly_counts_list = comm.gather(per_rank_anomaly_counts, root=0)
+        correlation_maps = comm.gather(correlation_map_local, root=0)
+        regional_flags_lists = comm.gather(regional_flags_local, root=0)
     else:
         all_results_lists = [local_results]
         all_alerts_lists = [local_alerts]
         per_rank_times = [sum(local_request_durations)]
+        all_anomaly_reports = [anomaly_reports_local]
+        boundary_exchange_times = [boundary_exchange_time]
+        per_rank_anomaly_counts_list = [per_rank_anomaly_counts]
+        correlation_maps = [correlation_map_local]
+        regional_flags_lists = [regional_flags_local]
 
     # Collective stats (Reduce)
     global_temp_sum = comm.reduce(local_temp_sum, op=MPI.SUM, root=0)
@@ -386,11 +668,22 @@ def fetch_weather_data(
         sequential_estimate = sum(per_rank_times) if per_rank_times else parallel_time
         speedup = (sequential_estimate / parallel_time) if parallel_time > 0 else None
 
+        total_anomalies = sum(len(x) for x in all_anomaly_reports)
+        # reduce-like severity distribution aggregation
+        agg_sev = {'low': 0, 'medium': 0, 'high': 0, 'critical': 0}
+        for dct in per_rank_anomaly_counts_list:
+            for k in list(agg_sev.keys()):
+                agg_sev[k] += int(dct.get(k, 0))
+
         metrics = {
             'execution_time_sec': round(parallel_time, 4),
             'estimated_sequential_time_sec': round(sequential_estimate, 4),
             'speedup_factor': round(speedup, 3) if speedup else None,
             'per_rank_execution_sec': per_rank_exec,
+            'boundary_exchange_time_sec': {f'rank_{i}': round(float(boundary_exchange_times[i]), 4) for i in range(len(boundary_exchange_times))},
+            'anomaly_detection_counts': {f'rank_{i}': per_rank_anomaly_counts_list[i] for i in range(len(per_rank_anomaly_counts_list))},
+            'total_anomalies': total_anomalies,
+            'severity_distribution': agg_sev,
             'hottest_district': {'name': hottest_name, 'temperature_c': global_max_temp if temps else None},
             'coldest_district': {'name': coldest_name, 'temperature_c': global_min_temp if temps else None},
             'temperature_variance': variance,
@@ -417,6 +710,29 @@ def fetch_weather_data(
         # Write outputs
         _write_json_atomic(output_file, final_data)
         _write_json_atomic(metrics_file, metrics)
+
+        # Aggregate anomalies and correlation data for visualization
+        all_anoms = [item for sub in all_anomaly_reports for item in sub]
+        # anomaly heatmap by district
+        heatmap = {}
+        for ar in all_anoms:
+            name = ar['district']
+            heatmap[name] = heatmap.get(name, 0) + 1
+        # merge correlation maps
+        corr_map: Dict[str, float] = {}
+        for m in correlation_maps:
+            corr_map.update(m)
+        regional_flags = [item for sub in regional_flags_lists for item in sub]
+        anomaly_payload = {
+            'generated_at': datetime.now().isoformat(),
+            'total_anomalies': total_anomalies,
+            'severity_distribution': agg_sev,
+            'heatmap': heatmap,
+            'correlations': corr_map,
+            'regional_patterns': regional_flags,
+            'per_rank_counts': {f'rank_{i}': per_rank_anomaly_counts_list[i] for i in range(len(per_rank_anomaly_counts_list))},
+        }
+        _write_json_atomic(anomaly_file, anomaly_payload)
 
         # mark progress complete
         try:
