@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parallel Weather - Tamil Nadu</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script defer src="/script.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Parallel Weather Simulation — Tamil Nadu</h1>
+        <div class="controls">
+            <button id="refreshBtn">Refresh Now</button>
+            <span id="lastUpdated">Last updated: —</span>
+        </div>
+    </header>
+
+    <section class="averages">
+        <div class="avg-item"><strong>Avg Temp</strong>: <span id="avgTemp">—</span> °C</div>
+        <div class="avg-item"><strong>Avg Humidity</strong>: <span id="avgHumidity">—</span> %</div>
+        <div class="avg-item"><strong>Avg Rainfall</strong>: <span id="avgRain">—</span> mm</div>
+        <div class="avg-item"><strong>Avg Wind</strong>: <span id="avgWind">—</span> m/s</div>
+    </section>
+
+    <section>
+        <h2>District Weather (processed by MPI ranks)</h2>
+        <div id="grid" class="grid"></div>
+    </section>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weather Visualization</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Weather Visualization — Tamil Nadu</h1>
+    </header>
+
+    <section class="chart-buttons">
+        <button data-chart="temp">Temperature</button>
+        <button data-chart="humidity">Humidity</button>
+        <button data-chart="rain">Weather</button>
+        <button data-chart="wind">Wind Speed</button>
+    </section>
+
+    <section class="charts">
+        <canvas id="chartCanvas"></canvas>
+    </section>
+
+    <script src="/script.js"></script>
+</body>
+</html>

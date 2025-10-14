@@ -1,0 +1,299 @@
+{
+    "last_updated": "2025-09-25T11:30:16.456253",
+    "averages": {
+        "temperature_c": 31.27,
+        "humidity_pct": 57.53,
+        "rainfall_mm": 0.0,
+        "wind_speed_ms": 4.14
+    },
+    "districts": [
+        {
+            "district": "Ariyalur",
+            "temperature_c": 32.77,
+            "humidity_pct": 58,
+            "wind_speed_ms": 1.34,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Chengalpattu",
+            "temperature_c": 34.45,
+            "humidity_pct": 37,
+            "wind_speed_ms": 7.09,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Chennai",
+            "temperature_c": 33.29,
+            "humidity_pct": 64,
+            "wind_speed_ms": 7.2,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Coimbatore",
+            "temperature_c": 30.84,
+            "humidity_pct": 55,
+            "wind_speed_ms": 5.66,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Cuddalore",
+            "temperature_c": 31.21,
+            "humidity_pct": 57,
+            "wind_speed_ms": 2.85,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Dharmapuri",
+            "temperature_c": 29.18,
+            "humidity_pct": 71,
+            "wind_speed_ms": 5.08,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Dindigul",
+            "temperature_c": 30.97,
+            "humidity_pct": 57,
+            "wind_speed_ms": 0.45,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Erode",
+            "temperature_c": 32.95,
+            "humidity_pct": 64,
+            "wind_speed_ms": 2.04,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Kallakurichi",
+            "temperature_c": 32.78,
+            "humidity_pct": 48,
+            "wind_speed_ms": 2.2,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Kanchipuram",
+            "temperature_c": 33.58,
+            "humidity_pct": 39,
+            "wind_speed_ms": 6.97,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Kanyakumari",
+            "temperature_c": 25.67,
+            "humidity_pct": 87,
+            "wind_speed_ms": 8.26,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Karur",
+            "temperature_c": 31.79,
+            "humidity_pct": 54,
+            "wind_speed_ms": 4.47,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Krishnagiri",
+            "temperature_c": 28.8,
+            "humidity_pct": 67,
+            "wind_speed_ms": 6.48,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Madurai",
+            "temperature_c": 33.97,
+            "humidity_pct": 49,
+            "wind_speed_ms": 4.12,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Nagapattinam",
+            "temperature_c": 32.23,
+            "humidity_pct": 56,
+            "wind_speed_ms": 4.88,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Namakkal",
+            "temperature_c": 32.5,
+            "humidity_pct": 68,
+            "wind_speed_ms": 2.69,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Nilgiris",
+            "temperature_c": 18.04,
+            "humidity_pct": 70,
+            "wind_speed_ms": 1.98,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Perambalur",
+            "temperature_c": 32.46,
+            "humidity_pct": 54,
+            "wind_speed_ms": 3.3,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Pudukkottai",
+            "temperature_c": 30.79,
+            "humidity_pct": 58,
+            "wind_speed_ms": 2.93,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Ramanathapuram",
+            "temperature_c": 31.55,
+            "humidity_pct": 58,
+            "wind_speed_ms": 5.18,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Ranipet",
+            "temperature_c": 32.47,
+            "humidity_pct": 41,
+            "wind_speed_ms": 6.94,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Salem",
+            "temperature_c": 30.14,
+            "humidity_pct": 66,
+            "wind_speed_ms": 2.06,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Sivaganga",
+            "temperature_c": 30.19,
+            "humidity_pct": 61,
+            "wind_speed_ms": 1.51,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tenkasi",
+            "temperature_c": 26.34,
+            "humidity_pct": 82,
+            "wind_speed_ms": 4.14,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Thanjavur",
+            "temperature_c": 33.25,
+            "humidity_pct": 64,
+            "wind_speed_ms": 0.45,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Theni",
+            "temperature_c": 31.89,
+            "humidity_pct": 52,
+            "wind_speed_ms": 3.64,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Thoothukudi",
+            "temperature_c": 34.2,
+            "humidity_pct": 49,
+            "wind_speed_ms": 3.09,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tiruchirappalli",
+            "temperature_c": 33.05,
+            "humidity_pct": 66,
+            "wind_speed_ms": 4.63,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tirunelveli",
+            "temperature_c": 33.83,
+            "humidity_pct": 47,
+            "wind_speed_ms": 6.15,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tirupathur",
+            "temperature_c": 29.69,
+            "humidity_pct": 63,
+            "wind_speed_ms": 6.27,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tiruppur",
+            "temperature_c": 29.8,
+            "humidity_pct": 59,
+            "wind_speed_ms": 3.43,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tiruvallur",
+            "temperature_c": 32.61,
+            "humidity_pct": 37,
+            "wind_speed_ms": 6.75,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tiruvarur",
+            "temperature_c": 33.29,
+            "humidity_pct": 49,
+            "wind_speed_ms": 5.09,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Tiruvannamalai",
+            "temperature_c": 31.83,
+            "humidity_pct": 49,
+            "wind_speed_ms": 4.99,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Viluppuram",
+            "temperature_c": 32.71,
+            "humidity_pct": 57,
+            "wind_speed_ms": 3.58,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        },
+        {
+            "district": "Virudhunagar",
+            "temperature_c": 30.54,
+            "humidity_pct": 58,
+            "wind_speed_ms": 1.27,
+            "rainfall_mm": 0,
+            "processor_rank": 0
+        }
+    ]
+}
