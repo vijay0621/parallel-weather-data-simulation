@@ -12,10 +12,24 @@ app = Flask(__name__)
 
 DISTRICTS = tn_districts.get_districts_list()
 DATA_FILE = 'data/weather.json'
+PROGRESS_FILE = 'data/progress.json'
+METRICS_FILE = 'data/metrics.json'
 
 def run_mpi_weather_fetch(num_processors=4):
     """Run the MPI weather fetch as a separate process"""
     try:
+        # Clear old progress/metrics so frontend sees a fresh run
+        try:
+            if os.path.exists(PROGRESS_FILE):
+                os.remove(PROGRESS_FILE)
+        except Exception:
+            pass
+        try:
+            if os.path.exists(METRICS_FILE):
+                os.remove(METRICS_FILE)
+        except Exception:
+            pass
+
         # Create a separate MPI script
         mpi_script_path = 'run_mpi_fetch.py'
         
@@ -56,6 +70,52 @@ mpi_fetch.fetch_weather_data(districts, output_file, num_processors)
         print(f"Error running MPI: {e}")
         return False
 
+
+def run_mpi_weather_fetch_async(num_processors=4):
+    """Start the MPI weather fetch asynchronously and return the process handle."""
+    try:
+        # Clear old progress/metrics so frontend sees a fresh run
+        try:
+            if os.path.exists(PROGRESS_FILE):
+                os.remove(PROGRESS_FILE)
+        except Exception:
+            pass
+        try:
+            if os.path.exists(METRICS_FILE):
+                os.remove(METRICS_FILE)
+        except Exception:
+            pass
+
+        mpi_script_path = 'run_mpi_fetch.py'
+        if not os.path.exists(mpi_script_path):
+            with open(mpi_script_path, 'w') as f:
+                f.write("""
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))
+import mpi_fetch
+import tn_districts
+
+districts = tn_districts.get_districts_list()
+output_file = sys.argv[1] if len(sys.argv) > 1 else 'data/weather.json'
+num_processors = int(sys.argv[2]) if len(sys.argv) > 2 else 4
+
+mpi_fetch.fetch_weather_data(districts, output_file, num_processors)
+""")
+
+        cmd = ['mpirun', '-n', str(num_processors), 'python', mpi_script_path, DATA_FILE, str(num_processors)]
+        try:
+            # Spawn and return immediately
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except FileNotFoundError:
+            cmd[0] = 'mpiexec'
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        return proc
+    except Exception as e:
+        print(f"Error starting MPI async: {e}")
+        return None
+
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
@@ -90,6 +150,35 @@ def refresh_data():
     with open(DATA_FILE, 'r') as f:
         data = json.load(f)
     return jsonify({'message': f'Data refreshed successfully with {num_processors} processors', 'data': data})
+
+@app.route('/api/refresh/start', methods=['POST'])
+def refresh_start():
+    body = request.get_json() or {}
+    num_processors = body.get('num_processors', 4)
+    proc = run_mpi_weather_fetch_async(num_processors)
+    if proc is None:
+        return jsonify({'error': 'Failed to start MPI job'}), 500
+    return jsonify({'message': f'Started MPI refresh with {num_processors} processors', 'pid': proc.pid})
+
+@app.route('/api/progress')
+def get_progress():
+    if not os.path.exists(PROGRESS_FILE):
+        return jsonify({'status': 'idle', 'completed': False, 'ranks': {}})
+    try:
+        with open(PROGRESS_FILE, 'r') as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify({'status': 'unknown'}), 500
+
+@app.route('/api/metrics')
+def get_metrics():
+    if not os.path.exists(METRICS_FILE):
+        return jsonify({})
+    try:
+        with open(METRICS_FILE, 'r') as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify({}), 500
 
 @app.route('/api/processor-info')
 def get_processor_info():

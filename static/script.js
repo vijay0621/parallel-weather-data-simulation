@@ -1,10 +1,23 @@
 let chartInstance = null;
+let progressInterval = null;
 
 async function fetchData() {
     const res = await fetch('/api/data');
     if (!res.ok) {
         throw new Error('Failed to load data');
     }
+    return res.json();
+}
+
+async function fetchProgress() {
+    const res = await fetch('/api/progress');
+    if (!res.ok) return { status: 'idle', completed: false, ranks: {} };
+    return res.json();
+}
+
+async function fetchMetrics() {
+    const res = await fetch('/api/metrics');
+    if (!res.ok) return {};
     return res.json();
 }
 
@@ -20,7 +33,8 @@ function renderGrid(districts) {
     grid.innerHTML = '';
     districts.forEach(d => {
         const card = document.createElement('div');
-        card.className = 'card';
+        const sev = d.alert_severity || 'none';
+        card.className = `card severity-${sev}`;
 
         // Adapting the data to fit the new design
         const weatherIconCode = '04d'; // Placeholder: Your backend would need to provide this.
@@ -51,6 +65,65 @@ function renderGrid(districts) {
             </div>
         `;
         grid.appendChild(card);
+    });
+}
+
+function renderProcessorSummary(distribution) {
+    const container = document.getElementById('processorSummary');
+    if (!container) return;
+    const entries = Object.entries(distribution || {});
+    container.innerHTML = entries.map(([rank, list]) => {
+        return `<div class="proc">${rank}: ${list.join(', ')}</div>`;
+    }).join('');
+}
+
+function renderPerRankTimes(perRank) {
+    const container = document.getElementById('perRankTimes');
+    if (!container) return;
+    const items = Object.entries(perRank || {}).map(([rank, sec]) => `<div class="rank-time"><strong>${rank}</strong>: ${sec}s</div>`);
+    container.innerHTML = items.join('');
+}
+
+function renderMetrics(metrics) {
+    if (!metrics) return;
+    const elExec = document.getElementById('execTime');
+    if (elExec) elExec.textContent = metrics.execution_time_sec ?? '—';
+    const elSpeed = document.getElementById('speedup');
+    if (elSpeed) elSpeed.textContent = metrics.speedup_factor ?? '—';
+    const hottest = metrics.hottest_district;
+    const coldest = metrics.coldest_district;
+    const elHot = document.getElementById('hottest');
+    const elCold = document.getElementById('coldest');
+    if (elHot) elHot.textContent = hottest && hottest.name ? `${hottest.name} (${hottest.temperature_c}°C)` : '—';
+    if (elCold) elCold.textContent = coldest && coldest.name ? `${coldest.name} (${coldest.temperature_c}°C)` : '—';
+    const elVar = document.getElementById('variance');
+    if (elVar) elVar.textContent = metrics.temperature_variance ?? '—';
+    const elAlerts = document.getElementById('alertCount');
+    if (elAlerts) elAlerts.textContent = metrics.alert_summary ? metrics.alert_summary.total_alerts : '—';
+    renderPerRankTimes(metrics.per_rank_execution_sec || {});
+    const allg = metrics.allgather_independent_avgs || {};
+    const avgsEl = document.getElementById('allgatherAvgs');
+    if (avgsEl) {
+        avgsEl.innerHTML = `<div><strong>Allgather avg per rank</strong>: ${Object.entries(allg).map(([k,v]) => `${k}: ${v ?? '—'}`).join(' | ')}</div>`;
+    }
+}
+
+function renderProgress(progress) {
+    const container = document.getElementById('progressContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    const ranks = progress.ranks || {};
+    Object.keys(ranks).forEach(r => {
+        const { done, total } = ranks[r];
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        const row = document.createElement('div');
+        row.className = 'progress-row';
+        row.innerHTML = `
+            <div class="progress-label">Rank ${r}</div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <div class="progress-value">${done}/${total}</div>
+        `;
+        container.appendChild(row);
     });
 }
 
@@ -119,11 +192,15 @@ async function loadAndRender() {
         if (document.getElementById('grid')) {
             renderAverages(data.averages || {});
             renderGrid(data.districts || []);
+            renderProcessorSummary(data.processor_distribution || {});
         }
         
         if (document.getElementById('chartCanvas')) {
             renderChart(data.districts || [], 'temp');
         }
+
+        const metrics = await fetchMetrics();
+        renderMetrics(metrics);
 
     } catch (e) {
         console.error(e);
@@ -134,22 +211,24 @@ async function refreshNow() {
     const btn = document.getElementById('refreshBtn');
     btn.disabled = true;
     try {
-        const res = await fetch('/api/refresh', { method: 'POST' });
-        const json = await res.json();
-        if (json && json.data) {
-            updateLastUpdated(json.data.last_updated || Date.now());
-            
-            if (document.getElementById('grid')) {
-                renderAverages(json.data.averages || {});
-                renderGrid(json.data.districts || []);
-            }
-
-            if (document.getElementById('chartCanvas')) {
-                // Fetch data again to re-render the chart
+        const num = parseInt(document.getElementById('numProcs')?.value || '4', 10);
+        await fetch('/api/refresh/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ num_processors: num }) });
+        // Poll for progress
+        if (progressInterval) clearInterval(progressInterval);
+        progressInterval = setInterval(async () => {
+            const prog = await fetchProgress();
+            renderProgress(prog);
+            if (prog.completed) {
+                clearInterval(progressInterval);
                 const freshData = await fetchData();
-                renderChart(freshData.districts || [], 'temp');
+                updateLastUpdated(freshData.last_updated || Date.now());
+                renderAverages(freshData.averages || {});
+                renderGrid(freshData.districts || []);
+                renderProcessorSummary(freshData.processor_distribution || {});
+                const metrics = await fetchMetrics();
+                renderMetrics(metrics);
             }
-        }
+        }, 600);
     } catch (e) {
         console.error(e);
     } finally {
@@ -161,6 +240,8 @@ function setupEvents() {
     if (document.getElementById('refreshBtn')) {
         document.getElementById('refreshBtn').addEventListener('click', refreshNow);
     }
+    const sel = document.getElementById('numProcs');
+    if (sel) sel.addEventListener('change', () => {});
 
     if (document.getElementById('chartCanvas')) {
         document.querySelectorAll('.chart-buttons button').forEach(btn => {

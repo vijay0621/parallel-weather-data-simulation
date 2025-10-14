@@ -187,6 +187,39 @@ h1 {
     border-radius: 8px;
 }
 
+/* Progress Bars */
+.progress-container {
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+}
+.progress-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 70px;
+    gap: 10px;
+    align-items: center;
+    margin: 6px 0;
+}
+.progress-label { color: #444; font-weight: 600; }
+.progress-bar {
+    background: #eee;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00c853, #64dd17);
+}
+.progress-value { color: #666; font-size: 0.9em; }
+
+/* Severity color coding */
+.card.severity-low { border-left: 4px solid #ffb300; }
+.card.severity-medium { border-left: 4px solid #ef5350; }
+.card.severity-high { border-left: 4px solid #b71c1c; }
+
 /* Enhanced Card Styles with processor visualization */
 .card {
     background-color: rgba(43, 43, 43, 0.7);
