@@ -197,7 +197,7 @@ h1 {
 }
 .progress-row {
     display: grid;
-    grid-template-columns: 80px 1fr 70px;
+    grid-template-columns: 90px 1fr 70px;
     gap: 10px;
     align-items: center;
     margin: 6px 0;

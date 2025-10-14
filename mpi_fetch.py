@@ -136,6 +136,9 @@ def fetch_weather_data(
         ranks_progress = {}
         total_map = {}
         if size > 1:
+            # include coordinator rank 0 as a visible row (no work)
+            total_map['0'] = 0
+            ranks_progress['0'] = {'done': 0, 'total': 0}
             for r in range(1, size):
                 total_map[str(r)] = len(worker_chunks[r])
                 ranks_progress[str(r)] = {'done': 0, 'total': len(worker_chunks[r])}
@@ -241,6 +244,8 @@ def fetch_weather_data(
         ranks_progress: Dict[str, Dict[str, int]] = {
             str(r): {'done': 0, 'total': len(worker_chunks[r])} for r in range(1, size)
         }
+        # add rank 0 row for UI
+        ranks_progress['0'] = {'done': 0, 'total': 0}
         progress_reqs: Dict[int, MPI.Request] = {
             r: comm.irecv(source=r, tag=TAG_PROGRESS) for r in range(1, size)
         }
