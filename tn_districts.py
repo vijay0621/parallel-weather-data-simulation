@@ -36,4 +36,7 @@ def get_districts_list():
         {'name': 'Tiruvannamalai', 'lat': 12.23, 'lon': 79.07},
         {'name': 'Viluppuram', 'lat': 11.94, 'lon': 79.49},
         {'name': 'Virudhunagar', 'lat': 9.58, 'lon': 77.95},
+        # Added to bring list to 38 districts
+        {'name': 'Mayiladuthurai', 'lat': 11.11, 'lon': 79.65},
+        {'name': 'Vellore', 'lat': 12.92, 'lon': 79.13},
     ]

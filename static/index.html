@@ -9,10 +9,21 @@
 </head>
 <body>
     <header>
-        <h1>Parallel Weather Simulation — Tamil Nadu</h1>
-        <div class="controls">
-            <button id="refreshBtn">Refresh Now</button>
-            <span id="lastUpdated">Last updated: —</span>
+        <div class="controls" style="justify-content: space-between; width: 100%">
+            <div class="left-controls">
+                <a class="button-link" href="/visualization.html">Visualization</a>
+            </div>
+            <h1>Parallel Weather Simulation — Tamil Nadu</h1>
+            <div class="right-controls">
+                <button id="refreshBtn">Refresh Now</button>
+                <select id="numProcs">
+                    <option value="4" selected>4 ranks</option>
+                    <option value="2">2 ranks</option>
+                    <option value="6">6 ranks</option>
+                    <option value="8">8 ranks</option>
+                </select>
+                <span id="lastUpdated">Last updated: —</span>
+            </div>
         </div>
     </header>
 
@@ -25,7 +36,23 @@
 
     <section>
         <h2>District Weather (processed by MPI ranks)</h2>
+        <div id="progressContainer" class="progress-container"></div>
         <div id="grid" class="grid"></div>
+    </section>
+
+    <section class="metrics">
+        <h2>MPI Performance Metrics</h2>
+        <div class="metrics-grid">
+            <div><strong>Execution Time</strong>: <span id="execTime">—</span> s</div>
+            <div><strong>Speedup</strong>: <span id="speedup">—</span>x</div>
+            <div><strong>Hottest</strong>: <span id="hottest">—</span></div>
+            <div><strong>Coldest</strong>: <span id="coldest">—</span></div>
+            <div><strong>Temp Variance</strong>: <span id="variance">—</span></div>
+            <div><strong>Alerts</strong>: <span id="alertCount">—</span></div>
+        </div>
+        <div id="perRankTimes" class="per-rank-times"></div>
+        <div id="allgatherAvgs" class="allgather-avgs"></div>
+        <div id="processorSummary" class="processor-summary"></div>
     </section>
 </body>
 </html>

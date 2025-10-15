@@ -9,7 +9,21 @@
 </head>
 <body>
     <header>
-        <h1>Weather Visualization — Tamil Nadu</h1>
+        <div class="controls" style="justify-content: space-between; width: 100%">
+            <div class="left-controls">
+                <h1>Visualization</h1>
+            </div>
+            <div class="right-controls">
+                <button id="refreshBtn">Refresh Now</button>
+                <select id="numProcs">
+                    <option value="4" selected>4 ranks</option>
+                    <option value="2">2 ranks</option>
+                    <option value="6">6 ranks</option>
+                    <option value="8">8 ranks</option>
+                </select>
+                <span id="lastUpdated">Last updated: —</span>
+            </div>
+        </div>
     </header>
 
     <section class="chart-buttons">
