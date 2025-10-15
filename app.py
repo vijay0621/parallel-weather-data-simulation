@@ -259,10 +259,10 @@ def get_progress():
 
 @app.route('/api/metrics')
 def get_metrics():
-    if not os.path.exists(METRICS_FILE):
-        # Fallback compute from data if metrics file not yet available
-        fallback = _compute_fallback_metrics()
-        resp = make_response(jsonify(fallback))
+        if not os.path.exists(METRICS_FILE):
+            # Fallback compute from data if metrics file not yet available
+            fallback = _compute_fallback_metrics()
+            resp = make_response(jsonify(fallback))
         resp.headers['Cache-Control'] = 'no-store'
         return resp
     try:

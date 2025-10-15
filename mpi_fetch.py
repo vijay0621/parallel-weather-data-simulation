@@ -701,6 +701,7 @@ def fetch_weather_data(
         # compose final dataset JSON
         final_data = {
             'last_updated': datetime.now().isoformat(),
+            'last_updated_epoch_ms': int(time.time() * 1000),
             'total_processors_used': size,
             'processor_distribution': processor_distribution,
             'averages': averages,
@@ -747,6 +748,7 @@ def fetch_weather_data(
         prog.update({
             'status': 'done',
             'completed': True,
+            'metrics_ready': True,
             'ended_at': datetime.now().isoformat(),
         })
         _write_json_atomic(progress_file, prog)

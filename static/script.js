@@ -130,7 +130,12 @@ function renderProgress(progress) {
 function updateLastUpdated(ts) {
     const el = document.getElementById('lastUpdated');
     if (el) {
-      el.textContent = `Last updated: ${new Date(ts).toLocaleString()}`;
+      // support epoch override if provided
+      if (typeof ts === 'number') {
+        el.textContent = `Last updated: ${new Date(ts).toLocaleString()}`;
+      } else {
+        el.textContent = `Last updated: ${new Date(ts).toLocaleString()}`;
+      }
     }
 }
 
@@ -186,7 +191,7 @@ function renderChart(districts, kind) {
 async function loadAndRender() {
     try {
         const data = await fetchData();
-        updateLastUpdated(data.last_updated || Date.now());
+        updateLastUpdated(data.last_updated_epoch_ms || data.last_updated || Date.now());
         
         // Conditional rendering based on the page
         if (document.getElementById('grid')) {
@@ -224,7 +229,7 @@ async function refreshNow() {
             if (prog.completed) {
                 clearInterval(progressInterval);
                 const freshData = await fetchData();
-                updateLastUpdated(freshData.last_updated || Date.now());
+                updateLastUpdated(freshData.last_updated_epoch_ms || freshData.last_updated || Date.now());
                 renderAverages(freshData.averages || {});
                 renderGrid(freshData.districts || []);
                 renderProcessorSummary(freshData.processor_distribution || {});
