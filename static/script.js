@@ -191,7 +191,8 @@ function renderChart(districts, kind) {
 async function loadAndRender() {
     try {
         const data = await fetchData();
-        updateLastUpdated(data.last_updated_epoch_ms || data.last_updated || Date.now());
+        // Always reflect local system time in the UI
+        updateLastUpdated(Date.now());
         
         // Conditional rendering based on the page
         if (document.getElementById('grid')) {
@@ -219,6 +220,8 @@ async function refreshNow() {
     const btn = document.getElementById('refreshBtn');
     btn.disabled = true;
     try {
+        // Immediately show local system time upon click
+        updateLastUpdated(Date.now());
         const num = parseInt(document.getElementById('numProcs')?.value || '4', 10);
         await fetch('/api/refresh/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ num_processors: num }) });
         // Poll for progress
@@ -229,7 +232,8 @@ async function refreshNow() {
             if (prog.completed) {
                 clearInterval(progressInterval);
                 const freshData = await fetchData();
-                updateLastUpdated(freshData.last_updated_epoch_ms || freshData.last_updated || Date.now());
+                // On completion, stamp local system time
+                updateLastUpdated(Date.now());
                 renderAverages(freshData.averages || {});
                 renderGrid(freshData.districts || []);
                 renderProcessorSummary(freshData.processor_distribution || {});
