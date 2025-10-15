@@ -2,7 +2,7 @@ let chartInstance = null;
 let progressInterval = null;
 
 async function fetchData() {
-    const res = await fetch('/api/data');
+    const res = await fetch('/api/data', { cache: 'no-store' });
     if (!res.ok) {
         throw new Error('Failed to load data');
     }
@@ -10,13 +10,13 @@ async function fetchData() {
 }
 
 async function fetchProgress() {
-    const res = await fetch('/api/progress');
+    const res = await fetch('/api/progress', { cache: 'no-store' });
     if (!res.ok) return { status: 'idle', completed: false, ranks: {} };
     return res.json();
 }
 
 async function fetchMetrics() {
-    const res = await fetch('/api/metrics');
+    const res = await fetch('/api/metrics', { cache: 'no-store' });
     if (!res.ok) return {};
     return res.json();
 }
@@ -199,8 +199,11 @@ async function loadAndRender() {
             renderChart(data.districts || [], 'temp');
         }
 
-        const metrics = await fetchMetrics();
-        renderMetrics(metrics);
+        // small delay to ensure metrics file is written
+        setTimeout(async () => {
+            const metrics = await fetchMetrics();
+            renderMetrics(metrics);
+        }, 250);
 
     } catch (e) {
         console.error(e);
@@ -225,8 +228,10 @@ async function refreshNow() {
                 renderAverages(freshData.averages || {});
                 renderGrid(freshData.districts || []);
                 renderProcessorSummary(freshData.processor_distribution || {});
-                const metrics = await fetchMetrics();
-                renderMetrics(metrics);
+                setTimeout(async () => {
+                    const metrics = await fetchMetrics();
+                    renderMetrics(metrics);
+                }, 300);
             }
         }, 600);
     } catch (e) {

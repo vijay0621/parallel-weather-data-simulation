@@ -2,7 +2,7 @@ import os
 import json
 import subprocess
 import sys
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory, request, make_response
 from dotenv import load_dotenv
 
 import tn_districts
@@ -134,7 +134,9 @@ def get_weather_data():
     
     with open(DATA_FILE, 'r') as f:
         data = json.load(f)
-    return jsonify(data)
+    resp = make_response(jsonify(data))
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 @app.route('/api/refresh', methods=['POST'])
 def refresh_data():
@@ -163,22 +165,34 @@ def refresh_start():
 @app.route('/api/progress')
 def get_progress():
     if not os.path.exists(PROGRESS_FILE):
-        return jsonify({'status': 'idle', 'completed': False, 'ranks': {}})
+        resp = make_response(jsonify({'status': 'idle', 'completed': False, 'ranks': {}}))
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
     try:
         with open(PROGRESS_FILE, 'r') as f:
-            return jsonify(json.load(f))
+            resp = make_response(jsonify(json.load(f)))
+            resp.headers['Cache-Control'] = 'no-store'
+            return resp
     except Exception:
-        return jsonify({'status': 'unknown'}), 500
+        resp = make_response(jsonify({'status': 'unknown'}), 500)
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
 
 @app.route('/api/metrics')
 def get_metrics():
     if not os.path.exists(METRICS_FILE):
-        return jsonify({})
+        resp = make_response(jsonify({}))
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
     try:
         with open(METRICS_FILE, 'r') as f:
-            return jsonify(json.load(f))
+            resp = make_response(jsonify(json.load(f)))
+            resp.headers['Cache-Control'] = 'no-store'
+            return resp
     except Exception:
-        return jsonify({}), 500
+        resp = make_response(jsonify({}), 500)
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
 
 @app.route('/api/processor-info')
 def get_processor_info():
