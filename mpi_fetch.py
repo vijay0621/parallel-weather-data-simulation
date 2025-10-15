@@ -191,6 +191,7 @@ def fetch_weather_data(
         # Root knows how many items per worker from worker_chunks
         ranks_progress = {}
         total_map = {}
+        started_at_str = datetime.now().isoformat()
         if size > 1:
             # include coordinator rank 0 as a visible row (no work)
             total_map['0'] = 0
@@ -204,7 +205,7 @@ def fetch_weather_data(
 
         _write_json_atomic(progress_file, {
             'status': 'running',
-            'started_at': datetime.now().isoformat(),
+            'started_at': started_at_str,
             'updated_at': datetime.now().isoformat(),
             'completed': False,
             'size': size,
@@ -406,6 +407,13 @@ def fetch_weather_data(
         }
         # add rank 0 row for UI
         ranks_progress['0'] = {'done': 0, 'total': 0}
+        # load started_at from existing progress file if available
+        try:
+            with open(progress_file, 'r') as f:
+                _prog_tmp = json.load(f)
+                started_at_str = _prog_tmp.get('started_at') or datetime.now().isoformat()
+        except Exception:
+            started_at_str = datetime.now().isoformat()
         progress_reqs: Dict[int, MPI.Request] = {
             r: comm.irecv(source=r, tag=TAG_PROGRESS) for r in range(1, size)
         }
@@ -421,7 +429,7 @@ def fetch_weather_data(
                     ranks_progress[str(r)]['done'] = int(msg.get('done', 0))
                     _write_json_atomic(progress_file, {
                         'status': 'running',
-                        'started_at': None,
+                        'started_at': started_at_str,
                         'updated_at': datetime.now().isoformat(),
                         'completed': False,
                         'size': size,
@@ -434,7 +442,7 @@ def fetch_weather_data(
                     ranks_progress[str(r)]['done'] = ranks_progress[str(r)]['total']
                     _write_json_atomic(progress_file, {
                         'status': 'running',
-                        'started_at': None,
+                        'started_at': started_at_str,
                         'updated_at': datetime.now().isoformat(),
                         'completed': False,
                         'size': size,
